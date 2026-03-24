@@ -262,4 +262,6 @@ static inline u64 ksu_ktime_get_ns(void) { return ktime_to_ns(ktime_get()); }
 #define struct_size(p, member, n) (sizeof(*(p)) + (n) * sizeof(*(p)->member))
 #endif
 
+static inline void ksu_kfree_byref(void *buf) { kfree(*(void **)buf); }
+
 #endif
