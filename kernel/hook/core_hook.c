@@ -68,6 +68,9 @@ int ksu_handle_setuid(struct cred *new, const struct cred *old)
 
 int ksu_bprm_check(struct linux_binprm *bprm)
 {
+	if (unlikely(!current->seccomp.mode))
+		ksu_sulog_emit_bprm((const char *)bprm->filename);
+
 	if (likely(!ksu_execveat_hook))
 		return 0;
 
