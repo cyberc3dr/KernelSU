@@ -71,6 +71,8 @@ static noinline int ksu_sucompat_user_common(const char __user **filename_user,
 	if (!escalate)
 		goto no_escalate;
 
+	ksu_sulog_emit(KSU_SULOG_EVENT_SUCOMPAT, NULL, NULL, GFP_KERNEL);
+
 	if (!!escape_with_root_profile())
 		return 0;
 
@@ -130,6 +132,8 @@ static noinline int ksu_sucompat_kernel_common(void *filename_ptr, const char *f
 
 	if (!escalate)
 		goto no_escalate;
+
+	ksu_sulog_emit(KSU_SULOG_EVENT_SUCOMPAT, NULL, NULL, GFP_KERNEL);
 
 	if (!!escape_with_root_profile())
 		return 0;
