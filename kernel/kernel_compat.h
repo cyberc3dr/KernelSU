@@ -250,8 +250,8 @@ __weak void groups_sort(struct group_info *group_info) { } // no-op
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION (3, 15, 0)
-// this is wrong, we just want it to build
-#define task_ppid_nr task_pid_nr
+static inline pid_t ksu_task_ppid_nr(const struct task_struct *tsk) { return (pid_t)sys_getppid(); }
+#define task_ppid_nr ksu_task_ppid_nr
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION (3, 17, 0)
