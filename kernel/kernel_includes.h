@@ -72,6 +72,13 @@
 #include <linux/version.h>
 #include <linux/vmalloc.h>
 
+#ifdef CONFIG_KSU_SUSFS
+#include <linux/susfs.h>
+#include <linux/susfs_def.h>
+#include <linux/namei.h>
+#include "objsec.h"
+#endif // #ifdef CONFIG_KSU_SUSFS
+
 // versioned / conditional
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)

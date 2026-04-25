@@ -4,6 +4,65 @@
 #define LSM_HOOK_TYPE int
 #endif
 
+#ifdef CONFIG_KSU_SUSFS
+static inline bool is_zygote_isolated_service_uid(uid_t uid)
+{
+    uid %= 100000;
+    return (uid >= 99000 && uid < 100000);
+}
+
+static inline bool is_zygote_normal_app_uid(uid_t uid)
+{
+    uid %= 100000;
+    return (uid >= 10000 && uid < 19999);
+}
+
+extern u32 susfs_zygote_sid;
+extern struct cred *ksu_cred;
+
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+extern void susfs_run_sus_path_loop(void);
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
+
+struct susfs_handle_setuid_tw {
+    struct callback_head cb;
+};
+
+static void susfs_handle_setuid_tw_func(struct callback_head *cb)
+{
+    struct susfs_handle_setuid_tw *tw = container_of(cb, struct susfs_handle_setuid_tw, cb);
+    const struct cred *saved = override_creds(ksu_cred);
+
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+    susfs_run_sus_path_loop();
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
+
+    revert_creds(saved);
+    kfree(tw);
+}
+
+static void ksu_handle_extra_susfs_work(void)
+{
+    struct susfs_handle_setuid_tw *tw = kzalloc(sizeof(*tw), GFP_ATOMIC);
+
+    if (!tw) {
+        pr_err("susfs: No enough memory\n");
+        return;
+    }
+
+    tw->cb.func = susfs_handle_setuid_tw_func;
+
+    int err = task_work_add(current, &tw->cb, TWA_RESUME);
+    if (err) {
+        kfree(tw);
+        pr_err("susfs: Failed adding task_work 'susfs_handle_setuid_tw', err: %d\n", err);
+    }
+}
+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
+extern void susfs_try_umount(uid_t uid);
+#endif // #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
+#endif // #ifdef CONFIG_KSU_SUSFS
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0) || defined(CONFIG_IS_HW_HISI) ||                                     \
     defined(CONFIG_KSU_ALLOWLIST_WORKAROUND)
 LSM_HOOK_TYPE ksu_key_permission(key_ref_t key_ref, const struct cred *cred, unsigned perm)
@@ -32,6 +91,13 @@ LSM_HOOK_TYPE ksu_task_fix_setuid(struct cred *new, const struct cred *old, int 
     new_uid = new->uid.val;
     old_uid = old->uid.val;
 
+    #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+    // Check if spawned process is isolated service first, and force to do umount if so  
+    if (is_zygote_isolated_service_uid(new_uid)) {
+        goto do_umount;
+    }
+    #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+
     if (unlikely(is_uid_manager(new_uid))) {
         disable_seccomp();
         pr_info("install fd for manager: %d\n", new_uid);
@@ -47,6 +113,26 @@ LSM_HOOK_TYPE ksu_task_fix_setuid(struct cred *new, const struct cred *old, int 
     ksu_handle_umount(old_uid, new_uid);
 
     return 0;
+
+#ifdef CONFIG_KSU_SUSFS
+do_umount:
+    // Handle kernel umount
+#ifndef CONFIG_KSU_SUSFS_TRY_UMOUNT
+	return ksu_handle_umount(new, old);
+#else
+	susfs_try_umount(new_uid);
+#endif // #ifndef CONFIG_KSU_SUSFS_TRY_UMOUNT
+
+#ifdef CONFIG_KSU_SUSFS_SUS_PATH
+	//susfs_run_sus_path_loop(new_uid);
+#endif // #ifdef CONFIG_KSU_SUSFS_SUS_PATH
+
+	ksu_handle_extra_susfs_work();
+
+	susfs_set_current_proc_umounted();
+
+    return 0;
+#endif // #ifdef CONFIG_KSU_SUSFS
 }
 
 #ifdef CONFIG_KSU_LSM_HOOKS
