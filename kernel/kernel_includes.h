@@ -151,9 +151,9 @@
 #include <linux/hashtable.h>
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
-#include <linux/task_work.h>
-#endif
+//#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+//#include <linux/task_work.h>
+//#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
 #include <linux/lsm_hooks.h>
